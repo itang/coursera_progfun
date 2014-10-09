@@ -105,8 +105,6 @@ abstract class TweetSet {
    * This method takes a function and applies it to every element in the set.
    */
   def foreach(f: Tweet ⇒ Unit): Unit
-
-  def isEmpty: Boolean
 }
 
 class Empty extends TweetSet {
@@ -130,8 +128,6 @@ class Empty extends TweetSet {
   def mostRetweeted: Tweet = throw new java.util.NoSuchElementException()
 
   def descendingByRetweet: TweetList = Nil
-
-  def isEmpty: Boolean = true
 }
 
 class NonEmpty(val elem: Tweet, val left: TweetSet, val right: TweetSet) extends TweetSet {
@@ -139,10 +135,8 @@ class NonEmpty(val elem: Tweet, val left: TweetSet, val right: TweetSet) extends
 
   def filterAcc(p: Tweet ⇒ Boolean, acc: TweetSet): TweetSet = {
     def inner(set: TweetSet, p: Tweet ⇒ Boolean, acc: TweetSet): TweetSet = set match {
-      case e if e.isEmpty ⇒ acc
-      case e: NonEmpty ⇒
-        if (p(e.elem)) inner(e.right, p, inner(e.left, p, acc.incl(e.elem)))
-        else inner(e.right, p, inner(e.left, p, acc))
+      case e: NonEmpty ⇒ inner(e.right, p, inner(e.left, p, (if (p(e.elem)) acc.incl(e.elem) else acc)))
+      case _ ⇒ acc
     }
 
     inner(this, p, acc)
@@ -176,8 +170,8 @@ class NonEmpty(val elem: Tweet, val left: TweetSet, val right: TweetSet) extends
 
   def union(that: TweetSet): TweetSet = {
     def inner(set: TweetSet, acc: TweetSet): TweetSet = set match {
-      case e if e.isEmpty ⇒ acc
       case e: NonEmpty ⇒ inner(e.right, inner(e.left, acc.incl(e.elem)))
+      case _ ⇒ acc
     }
 
     inner(that, this)
@@ -185,11 +179,8 @@ class NonEmpty(val elem: Tweet, val left: TweetSet, val right: TweetSet) extends
 
   def mostRetweeted: Tweet = {
     def inner(set: TweetSet, curr: Tweet): Tweet = set match {
-      case e if e.isEmpty ⇒ curr
-      case e: NonEmpty ⇒
-        if (e.elem.retweets > curr.retweets)
-          inner(e.right, inner(e.left, (e.elem)))
-        else inner(e.right, inner(e.left, curr))
+      case e: NonEmpty ⇒ inner(e.right, inner(e.left, (if (e.elem.retweets > curr.retweets) e.elem else curr)))
+      case _ ⇒ curr
     }
 
     inner(this.remove(elem), elem)
