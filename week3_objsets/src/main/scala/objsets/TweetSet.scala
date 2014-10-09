@@ -105,6 +105,8 @@ abstract class TweetSet {
    * This method takes a function and applies it to every element in the set.
    */
   def foreach(f: Tweet ⇒ Unit): Unit
+
+  def isEmpty: Boolean
 }
 
 class Empty extends TweetSet {
@@ -128,16 +130,22 @@ class Empty extends TweetSet {
   def mostRetweeted: Tweet = throw new java.util.NoSuchElementException()
 
   def descendingByRetweet: TweetList = Nil
+
+  def isEmpty: Boolean = true
 }
 
-class NonEmpty(elem: Tweet, left: TweetSet, right: TweetSet) extends TweetSet {
+class NonEmpty(val elem: Tweet, val left: TweetSet, val right: TweetSet) extends TweetSet {
+  def isEmpty: Boolean = false
 
   def filterAcc(p: Tweet ⇒ Boolean, acc: TweetSet): TweetSet = {
-    var ret = acc
-    foreach(t ⇒ {
-      if (p(t)) ret = ret.incl(t)
-    })
-    ret
+    def inner(set: TweetSet, p: Tweet ⇒ Boolean, acc: TweetSet): TweetSet = set match {
+      case e if e.isEmpty ⇒ acc
+      case e: NonEmpty ⇒
+        if (p(e.elem)) inner(e.right, p, inner(e.left, p, acc.incl(e.elem)))
+        else inner(e.right, p, inner(e.left, p, acc))
+    }
+
+    inner(this, p, acc)
   }
 
   /**
@@ -167,27 +175,24 @@ class NonEmpty(elem: Tweet, left: TweetSet, right: TweetSet) extends TweetSet {
   }
 
   def union(that: TweetSet): TweetSet = {
-    var ret: TweetSet = this
+    def inner(set: TweetSet, acc: TweetSet): TweetSet = set match {
+      case e if e.isEmpty ⇒ acc
+      case e: NonEmpty ⇒ inner(e.right, inner(e.left, acc.incl(e.elem)))
+    }
 
-    that.foreach(t ⇒ {
-      if (!ret.contains(t)) {
-        ret = ret.incl(t)
-      }
-    })
-
-    ret
+    inner(that, this)
   }
 
   def mostRetweeted: Tweet = {
-    var max = -1
-    var ret: Tweet = null
-    foreach(t ⇒ {
-      if (t.retweets > max) {
-        max = t.retweets
-        ret = t
-      }
-    })
-    ret
+    def inner(set: TweetSet, curr: Tweet): Tweet = set match {
+      case e if e.isEmpty ⇒ curr
+      case e: NonEmpty ⇒
+        if (e.elem.retweets > curr.retweets)
+          inner(e.right, inner(e.left, (e.elem)))
+        else inner(e.right, inner(e.left, curr))
+    }
+
+    inner(this.remove(elem), elem)
   }
 
   def descendingByRetweet: TweetList = {
